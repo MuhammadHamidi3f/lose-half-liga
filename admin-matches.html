@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Matches — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · MATCH MANAGEMENT</p>
+    </header>
+
+    <main class="admin-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>MANAGE MATCHES</h2>
+        <span>Kelola jadwal dan hasil pertandingan.</span>
+      </section>
+
+      <section class="matches-management">
+        <h2>DAFTAR PERTANDINGAN</h2>
+
+        <div id="matchesList">Memuat data pertandingan...</div>
+      </section>
+
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+    <script src="admin-matches.js"></script>
+  </body>
+</html>

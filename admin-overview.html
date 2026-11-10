@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Overview — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <style>
+      .overview-container {
+        max-width: 1150px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin-top: 25px;
+      }
+
+      .overview-card {
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 12px;
+        padding: 24px;
+        color: white;
+      }
+
+      .overview-card p {
+        color: #aeb6c5;
+        margin-bottom: 12px;
+      }
+
+      .overview-card h2 {
+        color: #f5bd45;
+        font-size: 32px;
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .overview-section {
+        margin-top: 30px;
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 12px;
+        padding: 24px;
+        color: white;
+      }
+
+      .overview-section h3 {
+        color: #f5bd45;
+        margin-top: 0;
+      }
+
+      .overview-status {
+        display: flex;
+        justify-content: space-between;
+        padding: 14px 0;
+        border-bottom: 1px solid #303746;
+      }
+
+      .overview-status:last-child {
+        border-bottom: none;
+      }
+
+      .overview-number {
+        color: #f5bd45;
+        font-weight: bold;
+      }
+
+      .overview-refresh {
+        padding: 11px 20px;
+        border: none;
+        border-radius: 7px;
+        background: #eab135;
+        color: #090c13;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+
+      .overview-refresh:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .overview-message {
+        margin-top: 15px;
+        color: #aeb6c5;
+        font-size: 13px;
+      }
+
+      @media (max-width: 800px) {
+        .overview-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 500px) {
+        .overview-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · OVERVIEW</p>
+    </header>
+
+    <main class="overview-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>OVERVIEW DASHBOARD</h2>
+        <span>Ringkasan data Lose Half League Season 2.</span>
+      </section>
+
+      <!-- RINGKASAN DATA -->
+      <section class="overview-grid">
+        <div class="overview-card">
+          <p>TOTAL TEAMS</p>
+          <h2 id="totalTeams">-</h2>
+        </div>
+
+        <div class="overview-card">
+          <p>TOTAL PLAYERS</p>
+          <h2 id="totalPlayers">-</h2>
+        </div>
+
+        <div class="overview-card">
+          <p>TOTAL MATCHES</p>
+          <h2 id="totalMatches">-</h2>
+        </div>
+
+        <div class="overview-card">
+          <p>TOTAL NEWS</p>
+          <h2 id="totalNews">-</h2>
+        </div>
+      </section>
+
+      <!-- STATUS PERTANDINGAN -->
+      <section class="overview-section">
+        <h3>PERTANDINGAN</h3>
+
+        <div class="overview-status">
+          <span>Match selesai</span>
+          <span class="overview-number" id="finishedMatches">-</span>
+        </div>
+
+        <div class="overview-status">
+          <span>Belum selesai</span>
+          <span class="overview-number" id="upcomingMatches">-</span>
+        </div>
+
+        <div class="overview-status">
+          <span>Total pertandingan</span>
+          <span class="overview-number" id="matchSummary">-</span>
+        </div>
+      </section>
+
+      <button
+        class="overview-refresh"
+        id="refreshOverview"
+        type="button"
+        onclick="loadOverview()"
+      >
+        REFRESH DATA
+      </button>
+
+      <p id="overviewMessage" class="overview-message"></p>
+
+      <br /><br />
+
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+
+    <!-- SUPABASE AUTH -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      // ==========================================
+      // MENGHITUNG DATA TABEL
+      // ==========================================
+
+      async function getCount(table) {
+        const { count, error } = await db.from(table).select("id", {
+          count: "exact",
+          head: true,
+        });
+
+        if (error) {
+          console.error("[OVERVIEW COUNT]", table, error);
+          return null;
+        }
+
+        return count;
+      }
+
+      // ==========================================
+      // LOAD OVERVIEW
+      // ==========================================
+
+      async function loadOverview() {
+        const button = document.getElementById("refreshOverview");
+        const message = document.getElementById("overviewMessage");
+
+        // Tunggu verifikasi admin dari admin.js
+        const allowed = await window.adminReady;
+
+        if (!allowed) return;
+
+        button.disabled = true;
+        button.textContent = "MEMUAT DATA...";
+        message.textContent = "Mengambil data resmi liga...";
+
+        const ids = [
+          "totalTeams",
+          "totalPlayers",
+          "totalMatches",
+          "totalNews",
+          "finishedMatches",
+          "upcomingMatches",
+          "matchSummary",
+        ];
+
+        ids.forEach((id) => {
+          document.getElementById(id).textContent = "...";
+        });
+
+        try {
+          const [teams, players, matches, news, matchData] = await Promise.all([
+            getCount("teams"),
+            getCount("players"),
+            getCount("matches"),
+            getCount("news"),
+
+            db.from("matches").select("status"),
+          ]);
+
+          if (matchData.error) {
+            throw matchData.error;
+          }
+
+          const matchRows = matchData.data || [];
+
+          const finished = matchRows.filter(
+            (match) => match.status === "finished",
+          ).length;
+
+          const unfinished = matchRows.length - finished;
+
+          document.getElementById("totalTeams").textContent = teams ?? "Error";
+
+          document.getElementById("totalPlayers").textContent =
+            players ?? "Error";
+
+          document.getElementById("totalMatches").textContent =
+            matches ?? "Error";
+
+          document.getElementById("totalNews").textContent = news ?? "Error";
+
+          document.getElementById("finishedMatches").textContent = finished;
+
+          document.getElementById("upcomingMatches").textContent = unfinished;
+
+          document.getElementById("matchSummary").textContent =
+            matches ?? "Error";
+
+          const hasError = [teams, players, matches, news].some(
+            (value) => value === null,
+          );
+
+          message.textContent = hasError
+            ? "Sebagian data gagal dimuat. Periksa Console."
+            : "Data overview berhasil diperbarui.";
+        } catch (error) {
+          console.error("[OVERVIEW ERROR]", error);
+
+          message.textContent = "Gagal memuat ringkasan data liga.";
+
+          ids.forEach((id) => {
+            const element = document.getElementById(id);
+
+            if (element.textContent === "...") {
+              element.textContent = "Error";
+            }
+          });
+        } finally {
+          button.disabled = false;
+          button.textContent = "REFRESH DATA";
+        }
+      }
+
+      // ==========================================
+      // INITIALIZE
+      // ==========================================
+
+      loadOverview();
+    </script>
+  </body>
+</html>

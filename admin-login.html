@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Admin Login — Lose Half League</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: #090b12;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
+
+      .login-card {
+        width: 100%;
+        max-width: 430px;
+        padding: 35px;
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 14px;
+      }
+
+      .login-brand {
+        color: white;
+        font-size: 27px;
+        font-weight: 900;
+        margin-bottom: 8px;
+      }
+
+      .login-brand span {
+        color: #f5bd45;
+      }
+
+      .login-subtitle {
+        color: #9ca5b5;
+        margin-bottom: 30px;
+        font-size: 13px;
+        letter-spacing: 2px;
+      }
+
+      .login-card h2 {
+        margin-bottom: 25px;
+      }
+
+      .login-field {
+        margin-bottom: 18px;
+      }
+
+      .login-field label {
+        display: block;
+        color: #c5cad4;
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+
+      .login-field input {
+        width: 100%;
+        padding: 13px;
+        border-radius: 7px;
+        border: 1px solid #303746;
+        background: #090c13;
+        color: white;
+        font-size: 15px;
+        outline: none;
+      }
+
+      .login-field input:focus {
+        border-color: #eab135;
+      }
+
+      .login-button {
+        width: 100%;
+        margin-top: 10px;
+        padding: 14px;
+        border: none;
+        border-radius: 7px;
+        background: #eab135;
+        color: #090c13;
+        font-size: 15px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .login-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .login-message {
+        min-height: 22px;
+        margin-top: 18px;
+        color: #ff7777;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .login-footer {
+        margin-top: 25px;
+        color: #737d8e;
+        font-size: 11px;
+        text-align: center;
+        letter-spacing: 1px;
+      }
+
+      .back-website {
+        display: block;
+        margin-top: 20px;
+        text-align: center;
+        color: #c5cad4;
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .back-website:hover {
+        color: #f5bd45;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="login-card">
+      <div class="login-brand">LOSE HALF <span>LEAGUE</span></div>
+
+      <div class="login-subtitle">SEASON 02 · ADMIN ACCESS</div>
+
+      <h2>ADMIN LOGIN</h2>
+
+      <form id="loginForm">
+        <div class="login-field">
+          <label for="email">EMAIL ADDRESS</label>
+          <input
+            type="email"
+            id="email"
+            placeholder="Masukkan email admin"
+            autocomplete="username"
+            required
+          />
+        </div>
+
+        <div class="login-field">
+          <label for="password">PASSWORD</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="Masukkan password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <button type="submit" id="loginButton" class="login-button">
+          SIGN IN ↗
+        </button>
+
+        <div
+          id="loginMessage"
+          class="login-message"
+          role="status"
+          aria-live="polite"
+        ></div>
+      </form>
+
+      <div class="login-footer">AUTHORIZED PERSONNEL ONLY</div>
+
+      <a href="index.html" class="back-website"> ← KEMBALI KE WEBSITE </a>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      const loginForm = document.getElementById("loginForm");
+      const loginButton = document.getElementById("loginButton");
+      const loginMessage = document.getElementById("loginMessage");
+
+      // Tampilkan pesan jika akun tidak memiliki hak admin
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.get("error") === "not-admin") {
+        loginMessage.textContent = "Akun ini belum terdaftar sebagai admin.";
+      }
+
+      // Jika sudah login dan masih memiliki hak admin,
+      // langsung masuk ke dashboard.
+      window.db.auth.getSession().then(async ({ data, error }) => {
+        if (error || !data?.session) return;
+
+        const { data: isAdmin, error: adminError } =
+          await window.db.rpc("is_admin");
+
+        if (!adminError && isAdmin === true) {
+          window.location.replace("admin.html");
+        }
+      });
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        loginButton.disabled = true;
+        loginButton.textContent = "CHECKING ACCESS...";
+        loginMessage.textContent = "";
+
+        try {
+          const { data, error } = await window.db.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (error) throw error;
+
+          const { data: isAdmin, error: adminError } =
+            await window.db.rpc("is_admin");
+
+          if (adminError) {
+            await window.db.auth.signOut();
+            throw new Error("Gagal memeriksa hak admin: " + adminError.message);
+          }
+
+          if (isAdmin !== true) {
+            await window.db.auth.signOut();
+
+            throw new Error("Akun ini belum terdaftar sebagai admin.");
+          }
+
+          loginButton.textContent = "ACCESS GRANTED";
+
+          window.location.replace("admin.html");
+        } catch (error) {
+          console.error("[LOGIN]", error);
+
+          loginMessage.textContent =
+            error.message || "Login gagal. Coba periksa akun.";
+
+          loginButton.disabled = false;
+          loginButton.textContent = "SIGN IN ↗";
+        }
+      });
+    </script>
+  </body>
+</html>

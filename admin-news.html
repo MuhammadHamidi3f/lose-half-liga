@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage News — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · NEWS MANAGEMENT</p>
+    </header>
+
+    <main class="admin-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>MANAGE NEWS</h2>
+        <span>Kelola berita dan informasi resmi liga.</span>
+      </section>
+
+      <section class="admin-card">
+        <h2 id="formTitle">TAMBAH BERITA BARU</h2>
+
+        <form id="newsForm">
+          <input
+            type="text"
+            id="newsTitle"
+            placeholder="Judul berita"
+            required
+          />
+
+          <select id="newsCategory" required>
+            <option value="">Pilih kategori</option>
+            <option value="NEWS">NEWS</option>
+            <option value="MATCH REPORT">MATCH REPORT</option>
+            <option value="ANNOUNCEMENT">ANNOUNCEMENT</option>
+            <option value="TRANSFER">TRANSFER</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+
+          <input
+            type="text"
+            id="newsImage"
+            placeholder="URL gambar berita (opsional)"
+          />
+
+          <textarea
+            id="newsContent"
+            rows="7"
+            placeholder="Tulis isi berita..."
+            required
+          ></textarea>
+
+          <label>
+            <input type="checkbox" id="isPublished" />
+            Publikasikan berita sekarang
+          </label>
+
+          <br /><br />
+
+          <button type="submit" class="admin-button">SIMPAN BERITA</button>
+
+          <button
+            type="button"
+            class="admin-button"
+            id="cancelEdit"
+            style="display: none"
+          >
+            BATAL EDIT
+          </button>
+        </form>
+      </section>
+
+      <section>
+        <h2>DAFTAR BERITA</h2>
+
+        <div id="newsList" class="admin-menu">Memuat berita...</div>
+      </section>
+
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      let editingNewsId = null;
+      let newsData = [];
+
+      function escapeNewsHTML(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      }
+
+      async function loadNews() {
+        const container = document.getElementById("newsList");
+
+        container.innerHTML = "Memuat berita...";
+
+        const { data, error } = await db
+          .from("news")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error(error);
+          container.innerHTML = "Gagal memuat berita.";
+          return;
+        }
+
+        newsData = data || [];
+
+        if (newsData.length === 0) {
+          container.innerHTML = "Belum ada berita.";
+          return;
+        }
+
+        container.innerHTML = newsData
+          .map(
+            (news) => `
+        <div class="admin-card">
+
+            <h3>${escapeNewsHTML(news.title)}</h3>
+
+            <p>
+                Kategori: ${escapeNewsHTML(news.category || "-")}
+            </p>
+
+            <p>
+                Status:
+                <strong>
+                    ${news.is_published ? "PUBLISHED" : "DRAFT"}
+                </strong>
+            </p>
+
+            ${
+              news.image_url
+                ? `<img
+                    src="${escapeNewsHTML(news.image_url)}"
+                    alt="Gambar berita"
+                    style="width:160px;max-height:100px;object-fit:cover;border-radius:8px;"
+                >`
+                : ""
+            }
+
+            <p>
+                ${escapeNewsHTML(news.content).slice(0, 180)}
+                ${news.content?.length > 180 ? "..." : ""}
+            </p>
+
+            <button
+                class="admin-button"
+                onclick="editNews('${news.id}')"
+            >
+                EDIT DATA
+            </button>
+
+            <button
+                class="admin-button"
+                onclick="deleteNews('${news.id}')"
+            >
+                HAPUS
+            </button>
+
+        </div>
+    `,
+          )
+          .join("");
+      }
+
+      document
+        .getElementById("newsForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+
+          const title = document.getElementById("newsTitle").value.trim();
+          const category = document.getElementById("newsCategory").value;
+          const imageUrl = document.getElementById("newsImage").value.trim();
+          const content = document.getElementById("newsContent").value.trim();
+          const published = document.getElementById("isPublished").checked;
+
+          if (!title || !category || !content) {
+            alert("Lengkapi judul, kategori, dan isi berita!");
+            return;
+          }
+
+          const newsItem = {
+            title: title,
+            category: category,
+            image_url: imageUrl || null,
+            content: content,
+            is_published: published,
+            published_at: published
+              ? newsData.find((item) => item.id === editingNewsId)
+                  ?.published_at || new Date().toISOString()
+              : null,
+          };
+
+          let result;
+
+          if (editingNewsId) {
+            result = await db
+              .from("news")
+              .update(newsItem)
+              .eq("id", editingNewsId);
+          } else {
+            result = await db.from("news").insert([newsItem]);
+          }
+
+          if (result.error) {
+            console.error(result.error);
+            alert("Gagal menyimpan berita: " + result.error.message);
+            return;
+          }
+
+          alert(
+            editingNewsId
+              ? "Berita berhasil diperbarui!"
+              : "Berita berhasil ditambahkan!",
+          );
+
+          resetNewsForm();
+          await loadNews();
+        });
+
+      function editNews(newsId) {
+        const news = newsData.find(
+          (item) => String(item.id) === String(newsId),
+        );
+
+        if (!news) return;
+
+        editingNewsId = newsId;
+
+        document.getElementById("newsTitle").value = news.title || "";
+        document.getElementById("newsCategory").value = news.category || "";
+        document.getElementById("newsImage").value = news.image_url || "";
+        document.getElementById("newsContent").value = news.content || "";
+        document.getElementById("isPublished").checked = news.is_published;
+
+        document.getElementById("formTitle").textContent = "EDIT BERITA";
+        document.getElementById("cancelEdit").style.display = "inline-block";
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      async function deleteNews(newsId) {
+        if (!confirm("Yakin ingin menghapus berita ini?")) return;
+
+        const { error } = await db.from("news").delete().eq("id", newsId);
+
+        if (error) {
+          console.error(error);
+          alert("Gagal menghapus berita: " + error.message);
+          return;
+        }
+
+        alert("Berita berhasil dihapus!");
+        await loadNews();
+      }
+
+      function resetNewsForm() {
+        editingNewsId = null;
+
+        document.getElementById("newsForm").reset();
+        document.getElementById("formTitle").textContent = "TAMBAH BERITA BARU";
+        document.getElementById("cancelEdit").style.display = "none";
+      }
+
+      document
+        .getElementById("cancelEdit")
+        .addEventListener("click", resetNewsForm);
+
+      loadNews();
+    </script>
+  </body>
+</html>

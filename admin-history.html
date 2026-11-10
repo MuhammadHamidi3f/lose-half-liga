@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>History — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <style>
+      .history-container {
+        max-width: 1150px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 16px;
+        margin-top: 25px;
+      }
+
+      .history-item {
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        overflow-wrap: anywhere;
+      }
+
+      .history-item h3 {
+        color: #f5bd45;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+      }
+
+      .history-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+        color: #c5cad4;
+        font-size: 13px;
+      }
+
+      .history-badge {
+        padding: 5px 10px;
+        border-radius: 5px;
+        background: #303746;
+        font-weight: bold;
+      }
+
+      .history-data {
+        background: #090c13;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+      }
+
+      .history-data pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: #d5d9e2;
+        font-size: 12px;
+      }
+
+      .history-refresh,
+      .history-restore {
+        padding: 11px 20px;
+        border: none;
+        border-radius: 7px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .history-refresh {
+        background: #eab135;
+        color: #090c13;
+        margin-top: 20px;
+      }
+
+      .history-refresh:hover {
+        background: #ffd36b;
+      }
+
+      .history-restore {
+        background: #eab135;
+        color: #090c13;
+        margin-top: 16px;
+      }
+
+      .history-restore:hover {
+        background: #ffd36b;
+        transform: translateY(-1px);
+      }
+
+      .history-restore[data-action="DELETE"] {
+        background: #55c8a0;
+        color: #07130f;
+      }
+
+      .history-restore[data-action="DELETE"]:hover {
+        background: #7be0bb;
+      }
+
+      .history-restore:disabled,
+      .history-refresh:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .history-note {
+        margin-top: 12px;
+        color: #aeb8c8;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .history-action-help {
+        color: #aeb8c8;
+        font-size: 12px;
+        margin: 12px 0 0;
+        line-height: 1.6;
+      }
+
+      .history-status {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.4px;
+      }
+
+      .history-status.reversed {
+        background: rgba(85, 200, 160, 0.14);
+        color: #70dfb9;
+        border: 1px solid rgba(85, 200, 160, 0.35);
+      }
+
+      .history-status.available {
+        background: rgba(234, 177, 53, 0.12);
+        color: #f5bd45;
+        border: 1px solid rgba(234, 177, 53, 0.3);
+      }
+
+      .history-restore-label {
+        margin-top: 15px;
+        color: #eab135;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      #historyList {
+        color: #d5d9e2;
+      }
+
+      @media (max-width: 600px) {
+        .history-item {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · CHANGE HISTORY</p>
+    </header>
+
+    <main class="history-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>CHANGE HISTORY</h2>
+        <span>Riwayat perubahan data Lose Half League.</span>
+      </section>
+
+      <button type="button" id="refreshHistory" class="history-refresh">
+        REFRESH HISTORY
+      </button>
+
+      <p class="history-note">
+        Sistem mencatat INSERT, UPDATE, dan DELETE. Restore tersedia untuk
+        ketiga aksi tersebut. Setiap pemulihan akan tercatat sebagai riwayat
+        baru.
+      </p>
+
+      <section id="historyList" class="history-list">
+        Memuat riwayat perubahan...
+      </section>
+
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      const historyContainer = document.getElementById("historyList");
+
+      const refreshButton = document.getElementById("refreshHistory");
+
+      // MENYIMPAN SELURUH DATA HISTORY
+      let historyRows = [];
+
+      let historyById = new Map();
+
+      const RESTORABLE_TABLES = new Set([
+        "teams",
+        "players",
+        "matches",
+        "match_events",
+        "news",
+      ]);
+
+      function escapeHistoryHTML(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      }
+
+      function formatHistoryDate(value) {
+        if (!value) return "-";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) return "-";
+
+        return date.toLocaleString("id-ID");
+      }
+
+      // MEMBANDINGKAN SNAPSHOT JSON
+      function normalizeSnapshot(value) {
+        if (Array.isArray(value)) {
+          return value.map(normalizeSnapshot);
+        }
+
+        if (value && typeof value === "object") {
+          const result = {};
+
+          Object.keys(value)
+            .sort()
+            .forEach((key) => {
+              result[key] = normalizeSnapshot(value[key]);
+            });
+
+          return result;
+        }
+
+        return value;
+      }
+
+      function sameSnapshot(first, second) {
+        if (
+          first === null ||
+          first === undefined ||
+          second === null ||
+          second === undefined
+        ) {
+          return false;
+        }
+
+        return (
+          JSON.stringify(normalizeSnapshot(first)) ===
+          JSON.stringify(normalizeSnapshot(second))
+        );
+      }
+
+      // CARI AKSI KEBALIKAN DARI HISTORY
+      function findInverseHistory(item) {
+        if (!item || !Array.isArray(historyRows)) {
+          return null;
+        }
+
+        const action = String(item.action || "").toUpperCase();
+
+        const originalId = Number(item.id);
+
+        const candidates = historyRows.filter((candidate) => {
+          if (Number(candidate.id) <= originalId) {
+            return false;
+          }
+
+          if (candidate.table_name !== item.table_name) {
+            return false;
+          }
+
+          if (candidate.record_id !== item.record_id) {
+            return false;
+          }
+
+          const candidateAction = String(candidate.action || "").toUpperCase();
+
+          // UPDATE dibatalkan oleh UPDATE kebalikan.
+          if (action === "UPDATE") {
+            return (
+              candidateAction === "UPDATE" &&
+              sameSnapshot(candidate.old_data, item.new_data) &&
+              sameSnapshot(candidate.new_data, item.old_data)
+            );
+          }
+
+          // INSERT dibatalkan oleh DELETE.
+          if (action === "INSERT") {
+            return (
+              candidateAction === "DELETE" &&
+              sameSnapshot(candidate.old_data, item.new_data)
+            );
+          }
+
+          // DELETE dibatalkan oleh INSERT.
+          if (action === "DELETE") {
+            return (
+              candidateAction === "INSERT" &&
+              sameSnapshot(candidate.new_data, item.old_data)
+            );
+          }
+
+          return false;
+        });
+
+        // Ambil inverse action paling awal yang cocok.
+        candidates.sort((a, b) => Number(a.id) - Number(b.id));
+
+        return candidates[0] || null;
+      }
+
+      // KONFIGURASI RESTORE
+      function getRestoreConfig(item) {
+        const action = String(item.action || "UNKNOWN").toUpperCase();
+
+        const tableName = String(item.table_name || "").toLowerCase();
+
+        if (!RESTORABLE_TABLES.has(tableName)) {
+          return null;
+        }
+
+        if (action === "UPDATE" && item.old_data && item.new_data) {
+          return {
+            action,
+            buttonLabel: "↶ UNDO UPDATE",
+            confirmTitle: "UNDO PERUBAHAN DATA",
+            confirmBody:
+              "Data akan dikembalikan ke kondisi sebelum perubahan. " +
+              "Jika data sudah berubah lagi, server akan menolak proses.",
+          };
+        }
+
+        if (action === "INSERT" && item.new_data) {
+          return {
+            action,
+            buttonLabel: "↶ UNDO INSERT · HAPUS DATA INI",
+            confirmTitle: "BATALKAN PENAMBAHAN DATA",
+            confirmBody:
+              "Data yang ditambahkan akan dihapus. " +
+              "Proses dapat ditolak jika data sudah diedit atau masih dipakai.",
+          };
+        }
+
+        if (action === "DELETE" && item.old_data) {
+          return {
+            action,
+            buttonLabel: "↶ RESTORE DATA TERHAPUS",
+            confirmTitle: "PULIHKAN DATA TERHAPUS",
+            confirmBody:
+              "Snapshot data sebelum dihapus akan dimasukkan kembali. " +
+              "Proses dapat ditolak jika ID sudah digunakan atau relasi belum tersedia.",
+          };
+        }
+
+        return null;
+      }
+
+      // RENDER KARTU HISTORY
+      function renderHistoryItem(item) {
+        const action = String(item.action || "UNKNOWN").toUpperCase();
+
+        const restoreConfig = getRestoreConfig(item);
+
+        // PERIKSA APAKAH SUDAH DIBALIKKAN
+        const inverse = findInverseHistory(item);
+
+        let statusHTML = "";
+
+        if (inverse) {
+          statusHTML = `
+                    <div>
+                        <span class="history-status reversed">
+                            ✓ SUDAH DIBALIKKAN · HISTORY ID
+                            ${escapeHistoryHTML(inverse.id)}
+                        </span>
+                    </div>
+                `;
+        } else if (restoreConfig) {
+          statusHTML = `
+                    <div>
+                        <span class="history-status available">
+                            BELUM DIBALIKKAN
+                        </span>
+                    </div>
+                `;
+        }
+
+        const actorHTML = item.changed_by
+          ? escapeHistoryHTML(item.changed_by)
+          : "UID TIDAK TERSEDIA";
+
+        return `
+                <article class="history-item">
+
+                    <h3>
+                        ${escapeHistoryHTML(item.table_name || "Database")}
+                    </h3>
+
+                    <div class="history-meta">
+
+                        <span class="history-badge">
+                            ${escapeHistoryHTML(action)}
+                        </span>
+
+                        <span>
+                            HISTORY ID:
+                            ${escapeHistoryHTML(item.id)}
+                        </span>
+
+                        <span>
+                            ${escapeHistoryHTML(
+                              formatHistoryDate(item.changed_at),
+                            )}
+                        </span>
+
+                    </div>
+
+                    <div class="history-meta">
+                        <span>
+                            RECORD ID:
+                            ${escapeHistoryHTML(item.record_id || "-")}
+                        </span>
+                    </div>
+
+                    <div class="history-meta">
+                        <span>
+                            ADMIN UID:
+                            ${actorHTML}
+                        </span>
+                    </div>
+
+                    ${
+                      item.old_data
+                        ? `
+                                <div class="history-data">
+                                    <strong>DATA SEBELUMNYA</strong>
+
+                                    <pre>${escapeHistoryHTML(
+                                      JSON.stringify(item.old_data, null, 2),
+                                    )}</pre>
+                                </div>
+                            `
+                        : ""
+                    }
+
+                    ${
+                      item.new_data
+                        ? `
+                                <div class="history-data">
+                                    <strong>DATA TERBARU</strong>
+
+                                    <pre>${escapeHistoryHTML(
+                                      JSON.stringify(item.new_data, null, 2),
+                                    )}</pre>
+                                </div>
+                            `
+                        : ""
+                    }
+
+                    ${statusHTML}
+
+                    ${
+                      restoreConfig && !inverse
+                        ? `
+                                <button
+                                    type="button"
+                                    class="history-restore"
+                                    data-restore-id="${escapeHistoryHTML(item.id)}"
+                                    data-action="${escapeHistoryHTML(action)}"
+                                >
+                                    ${escapeHistoryHTML(
+                                      restoreConfig.buttonLabel,
+                                    )}
+                                </button>
+
+                                <p class="history-action-help">
+                                    ${escapeHistoryHTML(
+                                      restoreConfig.confirmBody,
+                                    )}
+                                </p>
+                            `
+                        : ""
+                    }
+
+                    ${
+                      !restoreConfig
+                        ? `
+                                <p class="history-restore-label">
+                                    RESTORE TIDAK TERSEDIA UNTUK AKSI / SNAPSHOT INI
+                                </p>
+                            `
+                        : ""
+                    }
+
+                </article>
+            `;
+      }
+
+      // MEMUAT HISTORY DARI SUPABASE
+      async function loadHistory() {
+        if (!window.db) {
+          historyContainer.textContent =
+            "Database client belum tersedia. Periksa admin.js.";
+          return;
+        }
+
+        refreshButton.disabled = true;
+
+        historyContainer.textContent = "Memuat riwayat perubahan...";
+
+        try {
+          const { data, error } = await window.db
+            .from("change_history")
+            .select("*")
+            .order("changed_at", { ascending: false })
+            .limit(200);
+
+          if (error) {
+            console.error("History error:", error);
+
+            historyContainer.textContent =
+              "Gagal memuat riwayat: " + error.message;
+
+            return;
+          }
+
+          if (!data || data.length === 0) {
+            historyRows = [];
+            historyById.clear();
+
+            historyContainer.textContent = "Belum ada riwayat perubahan.";
+
+            return;
+          }
+
+          // BAGIAN PENTING:
+          // HistoryRows harus diisi sebelum render.
+          historyRows = data;
+
+          historyById = new Map(data.map((item) => [String(item.id), item]));
+
+          historyContainer.innerHTML = data.map(renderHistoryItem).join("");
+        } catch (error) {
+          console.error(error);
+
+          historyContainer.textContent = "Terjadi kesalahan: " + error.message;
+        } finally {
+          refreshButton.disabled = false;
+        }
+      }
+
+      // EKSEKUSI RESTORE
+      async function restoreHistory(historyId, button) {
+        const item = historyById.get(String(historyId));
+
+        if (!item) {
+          alert("Data riwayat tidak ditemukan. Silakan refresh.");
+          return;
+        }
+
+        // CEGAH RESTORE ULANG
+        if (findInverseHistory(item)) {
+          alert(
+            "Riwayat ini sudah memiliki catatan aksi kebalikan. " +
+              "Silakan refresh History.",
+          );
+
+          await loadHistory();
+          return;
+        }
+
+        const config = getRestoreConfig(item);
+
+        if (!config) {
+          alert("Aksi atau snapshot tidak dapat dipulihkan.");
+          return;
+        }
+
+        const confirmed = confirm(
+          config.confirmTitle +
+            "\n\n" +
+            "Tabel: " +
+            item.table_name +
+            "\n" +
+            "Aksi asal: " +
+            config.action +
+            "\n" +
+            "History ID: " +
+            item.id +
+            "\n\n" +
+            config.confirmBody +
+            "\n\n" +
+            "Operasi ini benar-benar mengubah database.\n" +
+            "Lanjutkan?",
+        );
+
+        if (!confirmed) return;
+
+        button.disabled = true;
+        button.textContent = "MEMPROSES...";
+
+        try {
+          const { data, error } = await window.db.rpc(
+            "restore_change_history",
+            {
+              p_history_id: historyId,
+            },
+          );
+
+          if (error) {
+            console.error("Restore error:", error);
+
+            alert("RESTORE GAGAL\n\n" + error.message);
+
+            button.disabled = false;
+            button.textContent = config.buttonLabel;
+
+            return;
+          }
+
+          if (data && typeof data === "object" && data.success === false) {
+            alert(
+              "RESTORE DITOLAK\n\n" +
+                (data.message || "Perubahan tidak dapat dipulihkan."),
+            );
+
+            button.disabled = false;
+            button.textContent = config.buttonLabel;
+
+            return;
+          }
+
+          console.log("Restore response:", data);
+
+          alert(
+            "BERHASIL!\n\n" +
+              (data?.message || "Operasi pemulihan selesai.") +
+              "\n\nHistory ID: " +
+              historyId +
+              "\nAksi kebalikan akan tercatat otomatis.",
+          );
+
+          await loadHistory();
+        } catch (error) {
+          console.error(error);
+
+          alert("Terjadi kesalahan saat Restore:\n\n" + error.message);
+
+          button.disabled = false;
+          button.textContent = config.buttonLabel;
+        }
+      }
+
+      // EVENT REFRESH
+      refreshButton.addEventListener("click", loadHistory);
+
+      // EVENT RESTORE
+      historyContainer.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-restore-id]");
+
+        if (!button) return;
+
+        restoreHistory(button.dataset.restoreId, button);
+      });
+
+      // LOAD PERTAMA KALI
+      loadHistory();
+    </script>
+  </body>
+</html>

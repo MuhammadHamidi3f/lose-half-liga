@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Match Events — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .events-container {
+        max-width: 1150px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+      .event-form,
+      .event-item {
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 12px;
+        padding: 24px;
+        color: white;
+        margin-top: 20px;
+      }
+      .event-form h2,
+      .event-list-title {
+        color: #f5bd45;
+        margin-top: 0;
+      }
+      .event-fields {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .event-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .event-field label {
+        color: #aeb6c5;
+        font-size: 13px;
+        font-weight: bold;
+      }
+      .event-field input,
+      .event-field select,
+      .event-field textarea {
+        width: 100%;
+        padding: 12px;
+        border-radius: 7px;
+        border: 1px solid #303746;
+        background: #090c13;
+        color: white;
+        font: inherit;
+      }
+      .event-field textarea {
+        resize: vertical;
+        min-height: 85px;
+      }
+      .event-full {
+        grid-column: 1 / -1;
+      }
+      .event-submit {
+        margin-top: 20px;
+        padding: 13px 22px;
+        background: #eab135;
+        border: none;
+        border-radius: 7px;
+        color: #090c13;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .event-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .event-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+      }
+      .event-item h3 {
+        color: #f5bd45;
+        margin: 0 0 8px;
+      }
+      .event-item p {
+        color: #c5cad4;
+        margin: 5px 0;
+      }
+      .event-delete {
+        background: #713b43;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .event-notice {
+        color: #aeb6c5;
+        font-size: 13px;
+        margin-top: 15px;
+        line-height: 1.6;
+      }
+      @media (max-width: 650px) {
+        .event-fields {
+          grid-template-columns: 1fr;
+        }
+        .event-full {
+          grid-column: auto;
+        }
+        .event-item {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+
+      /* SEASON 02: MATCH EVENTS DISABLED */
+      .season-disabled-notice {
+        margin-top: 25px;
+        padding: 28px;
+        background: #11151f;
+        border: 1px solid #303746;
+        border-left: 4px solid #eab135;
+        border-radius: 12px;
+        color: white;
+      }
+      .season-disabled-notice .disabled-label {
+        display: inline-block;
+        margin-bottom: 15px;
+        padding: 7px 12px;
+        border: 1px solid #eab135;
+        border-radius: 5px;
+        background: rgba(234, 177, 53, 0.1);
+        color: #eab135;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1px;
+      }
+      .season-disabled-notice h2 {
+        margin: 0 0 12px;
+        color: #f5bd45;
+      }
+      .season-disabled-notice p {
+        color: #aeb6c5;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      /* Form and event history are preserved in source for Season 03. */
+      #eventForm,
+      .events-container > section[style] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · MATCH EVENT MANAGEMENT</p>
+    </header>
+    <main class="events-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>MATCH EVENTS</h2>
+        <span>Fitur pencatatan gol dinonaktifkan untuk Season 02.</span>
+      </section>
+      <section class="season-disabled-notice">
+        <span class="disabled-label">FEATURE DISABLED · SEASON 02</span>
+        <h2>MATCH EVENTS DINONAKTIFKAN</h2>
+        <p>
+          Fitur pencatatan gol dan pencetak gol sementara tidak digunakan pada
+          Lose Half League Season 02.
+        </p>
+        <p>
+          Pengelolaan hasil pertandingan tetap dilakukan melalui menu Match
+          Management. Klasemen dan statistik tim tetap berjalan berdasarkan skor
+          resmi pertandingan.
+        </p>
+        <p>Fitur Match Events direncanakan tersedia kembali untuk Season 03.</p>
+      </section>
+      <!-- FORM TAMBAH EVENT -->
+      <form id="eventForm" class="event-form">
+        <h2>CATAT GOL PERTANDINGAN</h2>
+        <div class="event-fields">
+          <div class="event-field event-full">
+            <label for="matchSelect">PERTANDINGAN</label>
+            <select id="matchSelect" required>
+              <option value="">Pilih pertandingan</option>
+            </select>
+          </div>
+          <div class="event-field">
+            <label for="teamSelect">TIM PENCETAK GOL</label>
+            <select id="teamSelect" required disabled>
+              <option value="">Pilih pertandingan dahulu</option>
+            </select>
+          </div>
+          <div class="event-field">
+            <label for="playerSelect">PEMAIN</label>
+            <select id="playerSelect" required disabled>
+              <option value="">Pilih tim dahulu</option>
+            </select>
+          </div>
+          <div class="event-field">
+            <label for="eventMinute">MENIT GOL</label>
+            <input
+              type="number"
+              id="eventMinute"
+              min="0"
+              max="130"
+              placeholder="Contoh: 45"
+              required
+            />
+          </div>
+          <div class="event-field">
+            <label>JENIS EVENT</label>
+            <input value="GOAL" disabled />
+          </div>
+          <div class="event-field event-full">
+            <label for="eventNotes">CATATAN (OPSIONAL)</label>
+            <textarea
+              id="eventNotes"
+              placeholder="Tambahkan catatan pertandingan..."
+            ></textarea>
+          </div>
+        </div>
+        <button type="submit" id="saveEvent" class="event-submit">
+          SIMPAN GOL
+        </button>
+        <p class="event-notice">
+          Data gol akan digunakan untuk menghitung Top Scorer. Pencatatan event
+          tidak mengubah skor resmi pertandingan. Skor tetap dikelola melalui
+          halaman Match Management.
+        </p>
+      </form>
+      <!-- DAFTAR EVENT -->
+      <section style="margin-top: 35px">
+        <h2 class="event-list-title">RIWAYAT EVENT PERTANDINGAN</h2>
+        <div id="eventsList">Memuat data event...</div>
+      </section>
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+    <script>
+      if (false) {
+        const matchSelect = document.getElementById("matchSelect");
+        const teamSelect = document.getElementById("teamSelect");
+        const playerSelect = document.getElementById("playerSelect");
+        const eventForm = document.getElementById("eventForm");
+        const eventsList = document.getElementById("eventsList");
+        const saveButton = document.getElementById("saveEvent");
+        let matchesData = [];
+        let teamsData = [];
+        let playersData = [];
+        let eventsData = [];
+        function safeHTML(value) {
+          return String(value ?? "").replace(
+            /[&<>"']/g,
+            (char) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[char],
+          );
+        }
+        async function loadBaseData() {
+          eventsList.textContent = "Memuat data...";
+          try {
+            const [matchResult, teamResult, playerResult] = await Promise.all([
+              db
+                .from("matches")
+                .select(
+                  "id, matchday, home_team_id, away_team_id, home_score, away_score, status",
+                )
+                .order("matchday"),
+              db.from("teams").select("id, team_name"),
+              db
+                .from("players")
+                .select("id, team_id, nickname, player_role")
+                .order("nickname"),
+            ]);
+            if (matchResult.error) throw matchResult.error;
+            if (teamResult.error) throw teamResult.error;
+            if (playerResult.error) throw playerResult.error;
+            matchesData = matchResult.data || [];
+            teamsData = teamResult.data || [];
+            playersData = playerResult.data || [];
+            renderMatchOptions();
+            await loadEvents();
+          } catch (error) {
+            console.error("[EVENT DATA]", error);
+            eventsList.textContent =
+              "Gagal memuat data. Periksa koneksi database.";
+          }
+        }
+        function getTeamName(id) {
+          const team = teamsData.find((item) => item.id === id);
+          return team?.team_name || "Tim tidak ditemukan";
+        }
+        function renderMatchOptions() {
+          matchSelect.innerHTML =
+            '<option value="">Pilih pertandingan</option>';
+          matchesData.forEach((match) => {
+            const home = getTeamName(match.home_team_id);
+            const away = getTeamName(match.away_team_id);
+            const option = document.createElement("option");
+            option.value = match.id;
+            option.textContent = `MD ${match.matchday} · ${home} vs ${away}`;
+            matchSelect.appendChild(option);
+          });
+        }
+        // Tim hanya boleh dipilih dari dua peserta pertandingan.
+        matchSelect.addEventListener("change", () => {
+          const match = matchesData.find(
+            (item) => item.id === matchSelect.value,
+          );
+          teamSelect.innerHTML = '<option value="">Pilih tim</option>';
+          playerSelect.innerHTML = '<option value="">Pilih tim dahulu</option>';
+          teamSelect.disabled = !match;
+          playerSelect.disabled = true;
+          if (!match) return;
+          [match.home_team_id, match.away_team_id].forEach((id) => {
+            const option = document.createElement("option");
+            option.value = id;
+            option.textContent = getTeamName(id);
+            teamSelect.appendChild(option);
+          });
+        });
+        // Pemain otomatis difilter berdasarkan tim.
+        teamSelect.addEventListener("change", () => {
+          const teamId = teamSelect.value;
+          playerSelect.innerHTML = '<option value="">Pilih pemain</option>';
+          const filteredPlayers = playersData.filter(
+            (player) => player.team_id === teamId,
+          );
+          playerSelect.disabled = !teamId;
+          filteredPlayers.forEach((player) => {
+            const option = document.createElement("option");
+            option.value = player.id;
+            option.textContent = `${player.nickname} · ${player.player_role || "-"}`;
+            playerSelect.appendChild(option);
+          });
+          if (teamId && filteredPlayers.length === 0) {
+            playerSelect.innerHTML =
+              '<option value="">Belum ada pemain di tim ini</option>';
+          }
+        });
+        // SIMPAN GOL
+        eventForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const matchId = matchSelect.value;
+          const teamId = teamSelect.value;
+          const playerId = playerSelect.value;
+          const minute = Number(document.getElementById("eventMinute").value);
+          const notes = document.getElementById("eventNotes").value.trim();
+          if (!matchId || !teamId || !playerId) {
+            alert("Lengkapi pertandingan, tim, dan pemain.");
+            return;
+          }
+          if (!Number.isInteger(minute) || minute < 0 || minute > 130) {
+            alert("Menit pertandingan harus antara 0 sampai 130.");
+            return;
+          }
+          const selectedMatch = matchesData.find((item) => item.id === matchId);
+          if (
+            !selectedMatch ||
+            ![selectedMatch.home_team_id, selectedMatch.away_team_id].includes(
+              teamId,
+            )
+          ) {
+            alert("Tim tidak sesuai dengan pertandingan.");
+            return;
+          }
+          const selectedPlayer = playersData.find(
+            (item) => item.id === playerId,
+          );
+          if (!selectedPlayer || selectedPlayer.team_id !== teamId) {
+            alert("Pemain tidak terdaftar pada tim tersebut.");
+            return;
+          }
+          saveButton.disabled = true;
+          saveButton.textContent = "MENYIMPAN...";
+          try {
+            const { error } = await db.from("match_events").insert({
+              match_id: matchId,
+              team_id: teamId,
+              player_id: playerId,
+              event_type: "goal",
+              event_minute: minute,
+              event_value: 1,
+              notes: notes || null,
+            });
+            if (error) throw error;
+            alert("Gol berhasil dicatat!");
+            eventForm.reset();
+            teamSelect.disabled = true;
+            playerSelect.disabled = true;
+            await loadEvents();
+          } catch (error) {
+            console.error("[SAVE EVENT]", error);
+            alert("Gagal mencatat gol: " + error.message);
+          } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = "SIMPAN GOL";
+          }
+        });
+        // MEMUAT EVENT
+        async function loadEvents() {
+          eventsList.textContent = "Memuat riwayat event...";
+          const { data, error } = await db
+            .from("match_events")
+            .select("*")
+            .limit(200);
+          if (error) {
+            console.error("[LOAD EVENTS]", error);
+            eventsList.textContent = "Gagal memuat riwayat event.";
+            return;
+          }
+          eventsData = data || [];
+          if (eventsData.length === 0) {
+            eventsList.innerHTML =
+              "<p>Belum ada event pertandingan yang dicatat.</p>";
+            return;
+          }
+          eventsList.innerHTML = eventsData
+            .map((item) => {
+              const match = matchesData.find(
+                (match) => match.id === item.match_id,
+              );
+              const player = playersData.find(
+                (player) => player.id === item.player_id,
+              );
+              const home = match
+                ? getTeamName(match.home_team_id)
+                : "Pertandingan";
+              const away = match ? getTeamName(match.away_team_id) : "";
+              return `
+                    <article class="event-item">
+                        <div>
+                            <h3>${safeHTML(
+                              player?.nickname || "Pemain tidak ditemukan",
+                            )}</h3>
+                            <p>
+                                ${safeHTML(getTeamName(item.team_id))}
+                            </p>
+                            <p>
+                                MD ${safeHTML(match?.matchday || "-")}
+                                · ${safeHTML(home)} vs ${safeHTML(away)}
+                            </p>
+                            <p>
+                                GOAL · Menit ${safeHTML(item.event_minute ?? "-")}
+                            </p>
+                            ${
+                              item.notes
+                                ? `
+                                <p>Catatan: ${safeHTML(item.notes)}</p>
+                            `
+                                : ""
+                            }
+                        </div>
+                        <button
+                            class="event-delete"
+                            data-delete-event="${safeHTML(item.id)}"
+                        >
+                            HAPUS
+                        </button>
+                    </article>
+                `;
+            })
+            .join("");
+        }
+        // HAPUS EVENT
+        eventsList.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-delete-event]");
+          if (!button) return;
+          const eventId = button.dataset.deleteEvent;
+          if (!confirm("Hapus catatan gol ini?")) return;
+          button.disabled = true;
+          const { error } = await db
+            .from("match_events")
+            .delete()
+            .eq("id", eventId);
+          if (error) {
+            console.error("[DELETE EVENT]", error);
+            alert("Gagal menghapus event: " + error.message);
+            button.disabled = false;
+            return;
+          }
+          alert("Event berhasil dihapus.");
+          await loadEvents();
+        });
+        loadBaseData();
+      }
+    </script>
+  </body>
+</html>

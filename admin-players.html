@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Players — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · PLAYER MANAGEMENT</p>
+    </header>
+
+    <main class="admin-container">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>MANAGE PLAYERS</h2>
+        <span>Kelola seluruh data pemain peserta liga.</span>
+      </section>
+
+      <section class="admin-card">
+        <h2 id="formTitle">TAMBAH PEMAIN BARU</h2>
+
+        <form id="playerForm">
+          <div class="admin-form-grid">
+            <input
+              type="text"
+              id="nickname"
+              placeholder="Nickname pemain"
+              required
+            />
+
+            <select id="teamId" required>
+              <option value="">Pilih tim peserta</option>
+            </select>
+
+            <input
+              type="text"
+              id="playerRole"
+              placeholder="Role pemain (contoh: CF, AMF, GK)"
+              required
+            />
+          </div>
+
+          <button type="submit" class="admin-button">SIMPAN PEMAIN</button>
+
+          <button
+            type="button"
+            class="admin-button"
+            id="cancelEdit"
+            style="display: none"
+          >
+            BATAL EDIT
+          </button>
+        </form>
+      </section>
+
+      <section>
+        <h2>DAFTAR PEMAIN</h2>
+        <div id="playersList" class="admin-menu">Memuat data pemain...</div>
+      </section>
+
+      <a href="admin.html" class="admin-back"> ← KEMBALI KE DASHBOARD </a>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      let editingPlayerId = null;
+      let teamsData = [];
+
+      function escapePlayerHTML(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      }
+
+      async function loadTeamsForPlayers() {
+        const select = document.getElementById("teamId");
+
+        const { data, error } = await db
+          .from("teams")
+          .select("id, team_name")
+          .order("team_name");
+
+        if (error) {
+          console.error(error);
+          alert("Gagal memuat daftar tim.");
+          return;
+        }
+
+        teamsData = data || [];
+
+        select.innerHTML =
+          '<option value="">Pilih tim peserta</option>' +
+          teamsData
+            .map(
+              (team) => `
+            <option value="${team.id}">
+                ${escapePlayerHTML(team.team_name)}
+            </option>
+        `,
+            )
+            .join("");
+      }
+
+      async function loadPlayers() {
+        const container = document.getElementById("playersList");
+
+        container.innerHTML = "Memuat data pemain...";
+
+        const { data, error } = await db
+          .from("players")
+          .select("*")
+          .order("nickname");
+
+        if (error) {
+          console.error(error);
+          container.innerHTML = "Gagal memuat data pemain.";
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          container.innerHTML = "Belum ada pemain terdaftar.";
+          return;
+        }
+
+        container.innerHTML = data
+          .map((player) => {
+            const team = teamsData.find((item) => item.id === player.team_id);
+
+            return `
+            <div class="admin-card">
+                <h3>${escapePlayerHTML(player.nickname)}</h3>
+                <p>Tim: ${escapePlayerHTML(team?.team_name || "Tim tidak ditemukan")}</p>
+                <p>Role: ${escapePlayerHTML(player.player_role)}</p>
+
+                <button
+                    class="admin-button"
+                    onclick="editPlayer('${player.id}')"
+                >
+                    EDIT DATA
+                </button>
+
+                <button
+                    class="admin-button"
+                    onclick="deletePlayer('${player.id}')"
+                >
+                    HAPUS
+                </button>
+            </div>
+        `;
+          })
+          .join("");
+      }
+
+      document
+        .getElementById("playerForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+
+          const nickname = document.getElementById("nickname").value.trim();
+          const teamId = document.getElementById("teamId").value;
+          const playerRole = document.getElementById("playerRole").value.trim();
+
+          if (!nickname || !teamId || !playerRole) {
+            alert("Lengkapi semua data pemain!");
+            return;
+          }
+
+          const playerData = {
+            nickname: nickname,
+            team_id: teamId,
+            player_role: playerRole,
+          };
+
+          let result;
+
+          if (editingPlayerId) {
+            result = await db
+              .from("players")
+              .update(playerData)
+              .eq("id", editingPlayerId);
+          } else {
+            result = await db.from("players").insert([playerData]);
+          }
+
+          if (result.error) {
+            console.error(result.error);
+            alert("Gagal menyimpan pemain: " + result.error.message);
+            return;
+          }
+
+          alert(
+            editingPlayerId
+              ? "Data pemain berhasil diperbarui!"
+              : "Pemain berhasil ditambahkan!",
+          );
+
+          resetPlayerForm();
+          loadPlayers();
+        });
+
+      async function editPlayer(playerId) {
+        const { data, error } = await db
+          .from("players")
+          .select("*")
+          .eq("id", playerId)
+          .single();
+
+        if (error) {
+          console.error(error);
+          alert("Gagal mengambil data pemain.");
+          return;
+        }
+
+        editingPlayerId = playerId;
+
+        document.getElementById("nickname").value = data.nickname || "";
+        document.getElementById("teamId").value = data.team_id || "";
+        document.getElementById("playerRole").value = data.player_role || "";
+
+        document.getElementById("formTitle").textContent = "EDIT DATA PEMAIN";
+        document.getElementById("cancelEdit").style.display = "inline-block";
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      async function deletePlayer(playerId) {
+        if (!confirm("Yakin ingin menghapus pemain ini?")) return;
+
+        const { error } = await db.from("players").delete().eq("id", playerId);
+
+        if (error) {
+          console.error(error);
+          alert("Gagal menghapus pemain: " + error.message);
+          return;
+        }
+
+        alert("Pemain berhasil dihapus!");
+        loadPlayers();
+      }
+
+      function resetPlayerForm() {
+        editingPlayerId = null;
+
+        document.getElementById("playerForm").reset();
+        document.getElementById("formTitle").textContent = "TAMBAH PEMAIN BARU";
+        document.getElementById("cancelEdit").style.display = "none";
+      }
+
+      document
+        .getElementById("cancelEdit")
+        .addEventListener("click", resetPlayerForm);
+
+      async function initializePlayersPage() {
+        await loadTeamsForPlayers();
+        await loadPlayers();
+      }
+
+      initializePlayersPage();
+    </script>
+  </body>
+</html>

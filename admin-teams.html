@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Teams — Lose Half League</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <style>
+      .teams-admin {
+        max-width: 1100px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+
+      .team-form {
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 14px;
+        padding: 25px;
+        margin-bottom: 35px;
+      }
+
+      .team-form h2 {
+        color: #f5bd45;
+        margin-bottom: 20px;
+      }
+
+      .team-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 15px;
+      }
+
+      .team-fields input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 13px;
+        border: 1px solid #303746;
+        border-radius: 8px;
+        background: #090c13;
+        color: white;
+      }
+
+      .team-form button,
+      .edit-button {
+        margin-top: 18px;
+        padding: 12px 22px;
+        border: 0;
+        border-radius: 8px;
+        background: #eab135;
+        color: #090c13;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .team-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .team-item {
+        background: #11151f;
+        border: 1px solid #303746;
+        border-radius: 14px;
+        padding: 20px;
+        color: white;
+      }
+
+      .team-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .team-info img {
+        width: 65px;
+        height: 65px;
+        object-fit: contain;
+        background: white;
+        border-radius: 6px;
+      }
+
+      .team-item h3 {
+        margin: 0 0 8px;
+        color: #f5bd45;
+      }
+
+      .team-item p {
+        margin: 5px 0;
+      }
+
+      .team-item button {
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 7px;
+        background: #eab135;
+        color: #090c13;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .team-item .edit-button {
+        margin-top: 15px;
+      }
+
+      .team-item button:hover,
+      .team-form button:hover {
+        opacity: 0.85;
+      }
+
+      .back-link {
+        display: inline-block;
+        margin-top: 30px;
+        color: #f5bd45;
+        text-decoration: none;
+      }
+
+      @media (max-width: 700px) {
+        .team-fields,
+        .team-list {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="admin-header">
+      <h1>LOSE HALF <span>LEAGUE</span></h1>
+      <p>SEASON 02 · TEAM MANAGEMENT</p>
+    </header>
+
+    <main class="teams-admin">
+      <section class="admin-welcome">
+        <p>MANAGEMENT SYSTEM</p>
+        <h2>MANAGE TEAMS</h2>
+        <span>Kelola seluruh data tim peserta liga.</span>
+      </section>
+
+      <!-- FORM TAMBAH DAN EDIT TIM -->
+      <section class="team-form">
+        <h2 id="formTitle">TAMBAH TIM BARU</h2>
+
+        <input type="hidden" id="teamId" />
+
+        <div class="team-fields">
+          <input
+            id="teamName"
+            type="text"
+            placeholder="Nama tim peserta"
+            maxlength="100"
+          />
+
+          <input
+            id="managerName"
+            type="text"
+            placeholder="Nama manager"
+            maxlength="100"
+          />
+
+          <input
+            id="clubName"
+            type="text"
+            placeholder="Nama klub eFootball"
+            maxlength="100"
+          />
+
+          <input
+            id="logoUrl"
+            type="text"
+            placeholder="Lokasi logo, contoh: assets/logo.png"
+            maxlength="500"
+          />
+        </div>
+
+        <button type="button" id="saveTeamButton" onclick="saveTeam()">
+          SIMPAN TIM
+        </button>
+
+        <button
+          type="button"
+          onclick="resetForm()"
+          style="background: #303746; color: white"
+        >
+          RESET
+        </button>
+      </section>
+
+      <h2 style="color: #f5bd45">DAFTAR TIM PESERTA</h2>
+
+      <section id="teamList" class="team-list">
+        <p>Memuat data tim...</p>
+      </section>
+
+      <a href="admin.html" class="back-link"> ← KEMBALI KE ADMIN DASHBOARD </a>
+    </main>
+
+    <!-- KONEKSI SUPABASE DAN ADMIN AUTH -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+
+    <script>
+      // Menggunakan koneksi bersama dari admin.js
+
+      // Mencegah permintaan data berjalan sebelum
+      // verifikasi admin selesai.
+      async function checkAdmin() {
+        const allowed = await window.adminReady;
+
+        if (!allowed) return false;
+
+        return true;
+      }
+
+      // ==========================================
+      // ESCAPE HTML
+      // ==========================================
+
+      function escapeHTML(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      }
+
+      // ==========================================
+      // MEMUAT DAFTAR TIM
+      // ==========================================
+
+      async function loadTeams() {
+        const container = document.getElementById("teamList");
+
+        const allowed = await checkAdmin();
+
+        if (!allowed) return;
+
+        container.innerHTML = "<p>Memuat data tim...</p>";
+
+        const { data, error } = await db
+          .from("teams")
+          .select("*")
+          .order("team_name");
+
+        if (error) {
+          console.error("[LOAD TEAMS]", error);
+
+          container.innerHTML =
+            "<p>Gagal memuat data tim. Periksa akses database.</p>";
+
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          container.innerHTML = "<p>Belum ada tim.</p>";
+          return;
+        }
+
+        container.innerHTML = data
+          .map(
+            (team) => `
+                <div class="team-item">
+
+                    <div class="team-info">
+
+                        <img
+                            src="${escapeHTML(team.logo_url || "assets/league-logo.jpeg")}"
+                            onerror="this.src='assets/league-logo.jpeg'"
+                            alt="Logo ${escapeHTML(team.team_name)}"
+                        >
+
+                        <div>
+                            <h3>${escapeHTML(team.team_name)}</h3>
+
+                            <p>
+                                Manager:
+                                ${escapeHTML(team.manager_name || "-")}
+                            </p>
+
+                            <p>
+                                Klub:
+                                ${escapeHTML(team.in_game_club || "-")}
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        class="edit-button"
+                        onclick="editTeam('${escapeHTML(team.id)}')"
+                    >
+                        EDIT DATA
+                    </button>
+
+                </div>
+            `,
+          )
+          .join("");
+      }
+
+      // ==========================================
+      // EDIT DATA TIM
+      // ==========================================
+
+      async function editTeam(id) {
+        const allowed = await checkAdmin();
+
+        if (!allowed) return;
+
+        const { data, error } = await db
+          .from("teams")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (error) {
+          console.error("[EDIT TEAM]", error);
+          alert("Gagal mengambil data tim.");
+          return;
+        }
+
+        document.getElementById("teamId").value = data.id;
+        document.getElementById("teamName").value = data.team_name || "";
+        document.getElementById("managerName").value = data.manager_name || "";
+        document.getElementById("clubName").value = data.in_game_club || "";
+        document.getElementById("logoUrl").value = data.logo_url || "";
+
+        document.getElementById("formTitle").textContent = "EDIT DATA TIM";
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
+
+      // ==========================================
+      // SIMPAN DATA TIM
+      // ==========================================
+
+      async function saveTeam() {
+        const allowed = await checkAdmin();
+
+        if (!allowed) return;
+
+        const button = document.getElementById("saveTeamButton");
+
+        const id = document.getElementById("teamId").value;
+
+        const teamName = document.getElementById("teamName").value.trim();
+
+        const managerName = document.getElementById("managerName").value.trim();
+
+        const clubName = document.getElementById("clubName").value.trim();
+
+        const logoUrl = document.getElementById("logoUrl").value.trim();
+
+        if (!teamName) {
+          alert("Nama tim wajib diisi!");
+          return;
+        }
+
+        const teamData = {
+          team_name: teamName,
+          manager_name: managerName || null,
+          in_game_club: clubName || null,
+          logo_url: logoUrl || null,
+        };
+
+        button.disabled = true;
+        button.textContent = "MENYIMPAN...";
+
+        try {
+          let result;
+
+          if (id) {
+            result = await db.from("teams").update(teamData).eq("id", id);
+          } else {
+            result = await db.from("teams").insert(teamData);
+          }
+
+          if (result.error) {
+            throw result.error;
+          }
+
+          alert(
+            id
+              ? "Data tim berhasil diperbarui!"
+              : "Tim baru berhasil ditambahkan!",
+          );
+
+          resetForm();
+
+          await loadTeams();
+        } catch (error) {
+          console.error("[SAVE TEAM]", error);
+
+          alert("Gagal menyimpan data tim: " + error.message);
+        } finally {
+          button.disabled = false;
+          button.textContent = "SIMPAN TIM";
+        }
+      }
+
+      // ==========================================
+      // RESET FORM
+      // ==========================================
+
+      function resetForm() {
+        document.getElementById("teamId").value = "";
+        document.getElementById("teamName").value = "";
+        document.getElementById("managerName").value = "";
+        document.getElementById("clubName").value = "";
+        document.getElementById("logoUrl").value = "";
+
+        document.getElementById("formTitle").textContent = "TAMBAH TIM BARU";
+      }
+
+      // ==========================================
+      // INITIALIZE
+      // ==========================================
+
+      loadTeams();
+    </script>
+  </body>
+</html>
